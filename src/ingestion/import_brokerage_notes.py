@@ -1,15 +1,49 @@
 import os 
 from pypdf import PdfReader
+from dotenv import load_dotenv
 
 #Configuracao dos diretorios relativos
 #BASE_DIR = os.path.join(os.path.dirname(__file__),"..","..")
 BASE_DIR = os.getcwd()
 BRONZE_DIR = os.path.join(BASE_DIR,"data_lake","bronze")
 
+# load the variables from hidden file  .env
+#load_dotenv()
+dotenv_path = os.path.join(BASE_DIR, ".env")
+load_dotenv(dotenv_path=dotenv_path)
+
 def extract_text_from_pdf(pdf_path):
     #Read pdf file e extract data_lake
     try:
         reader = PdfReader(pdf_path)
+        
+        if reader.is_encrypted:
+            print("Password-protected file detected")
+        
+            #Use the password loaded from .env file
+            pwd = None
+            
+            env_path = os.path.join(os.getcwd(),".env")
+            
+            if os.path.exists(env_path):
+                with open(env_path,"r", encoding="utf-8") as env_file:
+                    for line in env_file:
+                        if line.startswith("SENHA_RICO"):
+                            pwd = line.split("=")[1].strip()
+                            break
+            
+            #os.getenv("SENHA_RICO")
+            
+            if not pwd:
+                print("Error: password not found on .env file")
+                return None
+                
+            try:
+                reader.decrypt(pwd)
+            except Exception as e:
+                print(f"Decryt error. Incorrect password. {e}")
+                return None
+        
         full_text = ""
         for page in reader.pages:
             text = page.extract_text()
@@ -48,11 +82,9 @@ def run_ingestion():
         extract_text = extract_text_from_pdf(pdf_path)
         
         if extract_text:
-
             #extracting text from original pdf
             #Keeps the exact same name as original file, only changing the file extension
             #example: 'NotaCorretagem_Rico_123.pdf' vira 'NotaCorretagem_Rico_123.txt'
-            
             
             txt_name = os.path.splitext(pdf_name)[0] + ".txt"
             txt_path= os.path.join(BRONZE_DIR,txt_name)
@@ -63,7 +95,7 @@ def run_ingestion():
                 
             print(f"=== Text successfully extracted and saved to:{txt_name} ===")
         else:
-            print(f"=== Failed to extract text from file: {txt_name} ===")
+            print(f"=== Failed to extract text from file: {pdf_name} ===")
             
 if __name__ == "__main__":
     run_ingestion()

@@ -1,0 +1,41 @@
+📌 O Cenário Inicial
+O objetivo era criar um pipeline de dados financeiros (financial-data-pipeline) para automatizar a ingestão de notas de corretagem em PDF para a camada Bronze. O desafio aumentou quando entrou a nota da Rico, que vem criptografada e protegida por senha de fábrica (padrão SINACOR).
+
+💥 Os 4 Obstáculos no Caminho (O Sofrimento)
+O Bug do Código (UnboundLocalError):
+
+O que aconteceu: Quando o script falhava ao ler o PDF sem senha, ele tentava exibir uma mensagem de erro usando uma variável (txt_name) que ainda nem tinha sido criada no escopo local. O Python capotava com um erro de lógica de escopo.
+
+A Solução: Corrigimos a lógica do bloco except/else para referenciar a variável correta (pdf_name), permitindo que o script tratasse a falha graciosamente em vez de quebrar a execução.
+
+A Dança das Cadeiras das Variáveis:
+
+O que aconteceu: O código estava configurado para buscar CPF_SENHA_RICO, mas no arquivo de configuração do ambiente, a chave estava mapeada como SENHA_RICO. O Python simplesmente retornava None.
+
+A Solução: Ajustamos o script Python de forma limpa para mapear exatamente a variável definida no ambiente do projeto.
+
+A Pegadinha do Windows (O Falso Arquivo de Navegação):
+
+O que aconteceu: Esse foi o maior vilão. O Windows associou a extensão .env a um programa nativo do sistema e o transformou visualmente em um "Navigation Action File". Por causa disso, a biblioteca tradicional python-dotenv ficou completamente cega e não conseguia ler o arquivo de jeito nenhum.
+
+A Solução: Eliminamos o intermediário! Reescrevemos o trecho de leitura de credenciais usando a função nativa open() do Python para varrer o arquivo linha por linha. Se o pacote não lê, o Python lê no braço.
+
+O Arquivo Fantasma (..env):
+
+O que aconteceu: Durante as tentativas de renomear o arquivo pelo prompt para burlar a máscara do Windows, o sistema acabou criando um arquivo fantasma chamado literalmente ..env (com dois pontos). O PowerShell interpretava o comando de deleção como "voltar uma pasta" em vez de apagar o arquivo.
+
+A Solução: Usamos o caminho relativo explícito (.\..env) e comandos Set-Content direto pelo PowerShell na raiz exata do projeto (financial-data-pipeline) para limpar a casa e criar um .env legítimo de 16 bytes.
+
+🚀 O Resultado Final
+O pipeline rodou limpo, leu o .env nativamente, extraiu a senha secreta, abriu o PDF criptografado e gerou o arquivo bruto .txt na camada Bronze com sucesso absoluto.
+
+💡 Ideia de Gancho para o seu Post (Storytelling):
+"Quem vê o projeto rodando na arquitetura Medalhão com camadas Bronze, Silver e Gold, não imagina o que o Windows aprontou comigo nos bastidores... O sistema resolveu dizer que meu arquivo .env era um arquivo de mapas do GPS! 😂 [...]
+
+Lições de Engenharia de Dados aprendidas na marra:
+
+Não confie cegamente em bibliotecas de terceiros quando o sistema operacional mascara arquivos (contornamos o load_dotenv lendo o arquivo de forma nativa).
+
+Tratamento de exceções precisa ser testado para cenários de falha (o UnboundLocalError me ensinou a cuidar do escopo de variáveis no tratamento de erros).
+
+O terminal é o melhor amigo do engenheiro de dados quando a interface visual do Windows tenta te enganar."
