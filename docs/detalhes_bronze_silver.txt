@@ -1,0 +1,8 @@
+O que o script bronze_to_siver esta efetuando:
+- Normalização de tipos (Casting): 
+	Transforma strings complexas como "4.923,50" no formato numérico puro do Python (4923.50).
+- Abstração de Regras de Negócio: 
+	Aplica a regra: Débito (D) vira Operação de Compra (C), Crédito (C) vira Operação de Venda (V).
+- Expressao regular para batimento de padrões (RegEx): 
+	1 - Varre estruturas de texto de linha única (Inter) 
+	2 - Captura de contexto multi-linha (Rico). Na Rico observei que o cabeça vem em uma linha e o dado na linha seguinte
