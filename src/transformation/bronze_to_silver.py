@@ -180,8 +180,8 @@ if __name__ == "__main__":
                 for transaction in data:
                     costs=transaction.pop("costs",{})
                     transaction["settlement_fee"] = costs.get("settlement_fee",0.0)
-                    transaction["emonuments"] = costs.get("emolument",0.0)
-                    transaction["brokerate_fee"] = costs.get("brokerate_fee",0.0)
+                    transaction["emoluments"] = costs.get("emolument",0.0)
+                    transaction["brokerage_fee"] = costs.get("brokerage_fee",0.0)
                     
                     all_transactions.append(transaction)
                     
@@ -194,7 +194,7 @@ if __name__ == "__main__":
         
         print(f"\n✨ Silver layer successfully recorded on:: {parquet_path}")
         
-        print("\n--- Visualização dos dados na Silver ---")
+        print("\n--- Visualization - Silver data ---")
         
         print(df_silver.to_string()) # Exibe a tabela completa estruturada no terminal
                 
