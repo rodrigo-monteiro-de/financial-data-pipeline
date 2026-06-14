@@ -22,8 +22,6 @@ def process_bronze_file(file_path):
     trading_date = None
     brokerage = None
     
-        
-    
     #First step: find out the trading day and wich brokerage it is
     for i,line in enumerate(lines):
         if "INTER" in line:
@@ -40,7 +38,6 @@ def process_bronze_file(file_path):
         print(f"Brokerage or trading date not found")
         return []
     
-    # O print agora fica no lugar certo (executa se achar os dados)
     print(f"Extacting transactions | brokerage:{brokerage}| Trading date:{trading_date}")
     
     transactions = []
@@ -60,7 +57,7 @@ def process_bronze_file(file_path):
             if match:
                 qtt = int(match.group(1))
                 unit_price = clean_float(match.group(2))
-                total_value = clean_float(match.group(3))
+                gross_value = clean_float(match.group(3))
                 asset = match.group(4).strip()
                 dc_indicator = match.group(5) if match.group(5) else "C" # Default if not located on line
                 
@@ -73,7 +70,7 @@ def process_bronze_file(file_path):
                 "asset":asset,
                 "quantity":qtt,
                 "unit_price":unit_price,
-                "total_value":total_value
+                "gross_value":gross_value
                 })
             
         #PARSER - RICO
@@ -87,7 +84,7 @@ def process_bronze_file(file_path):
             if match_valores:
                 qtt = int(match_valores.group(1))
                 unit_price = clean_float(match_valores.group(2))
-                total_value = clean_float(match_valores.group(3))
+                gross_value = clean_float(match_valores.group(3))
                 dc_indicator = match_valores.group(4)
                 operation = "B" if dc_indicator == "D" else "S"
                 
@@ -110,50 +107,44 @@ def process_bronze_file(file_path):
                     "asset": asset,
                     "quantity": qtt,
                     "unit_price": unit_price,
-                    "total_value": total_value
+                    "gross_value": gross_value
                 })
                 
-        # Bloco de custos reindentado com 8 espaços (dentro da função process_bronze_file)
-        settlement_fee = 0.0
-        emoluments = 0.0
-        brokerage_fee = 0.0
+    settlement_fee = 0.0
+    emoluments = 0.0
+    brokerage_fee = 0.0
 
-        if brokerage == "INTER":
-            for idx, line in enumerate(lines):
-                if "Valor líquido das operações" in line:
-                    if idx + 8 < len(lines): settlement_fee = clean_float(lines[idx+8])
-                if "Emolumentos" in line:
-                    for offset in range(1, 10):
-                        if idx + offset < len(lines) and "Total" in lines[idx+offset]:
-                            emoluments = clean_float(lines[idx+offset].replace("Total", "").replace("D", "").replace("C", "").strip())
-                            break
-                if "Corretagem / Despesas" in line:
-                    for offset in range(1, 10):
-                        if idx + offset < len(lines) and "Total" in lines[idx+offset]:
-                            brokerage_fee = clean_float(lines[idx+offset].replace("Total", "").replace("D", "").replace("C", "").strip())
-                            break
-            for t in transactions:
-                t["costs"] = {"settlement_fee": settlement_fee, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
+    if brokerage == "INTER":
+        for idx, line in enumerate(lines):
+            if "Valor líquido das operações" in line:
+                if idx + 8 < len(lines): settlement_fee = clean_float(lines[idx+8])
+            if "Emolumentos" in line:
+                for offset in range(1, 10):
+                    if idx + offset < len(lines) and "Total" in lines[idx+offset]:
+                        emoluments = clean_float(lines[idx+offset].replace("Total", "").replace("D", "").replace("C", "").strip())
+                        break
+            if "Corretagem / Despesas" in line:
+                for offset in range(1, 10):
+                    if idx + offset < len(lines) and "Total" in lines[idx+offset]:
+                        brokerage_fee = clean_float(lines[idx+offset].replace("Total", "").replace("D", "").replace("C", "").strip())
+                        break
+        for t in transactions:
+            t["costs"] = {"settlement_fee": settlement_fee, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
 
-        if brokerage == "RICO":
-            for idx, line in enumerate(lines):
-                if "Taxa de liquidação" in line:
-                    for offset in range(1, 5):
-                        if idx + offset < len(lines) and any(char.isdigit() for char in lines[idx+offset]):
-                            settlement_fee = clean_float(lines[idx+offset].replace("D", "").replace("C", "").strip())
-                            break
-                if "Emolumentos" in line:
-                    for offset in range(1, 5):
-                        if idx + offset < len(lines) and any(char.isdigit() for char in lines[idx+offset]):
-                            emoluments = clean_float(lines[idx+offset].replace("D", "").replace("C", "").strip())
-                            break
-                if "Corretagem" in line or "Execução" in line:
-                    for offset in range(1, 5):
-                        if idx + offset < len(lines) and any(char.isdigit() for char in lines[idx+offset]):
-                            brokerage_fee = clean_float(lines[idx+offset].replace("D", "").replace("C", "").strip())
-                            break
-            for t in transactions:
-                t["costs"] = {"settlement_fee": settlement_fee, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
+    if brokerage == "RICO":
+        for idx, line in enumerate(lines):
+            if "Taxa de Transf. de Ativos" in line or "Taxa de liquidação" in line:
+                settlement_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
+                        
+            if "Emolumentos" in line:
+                emoluments = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
+                
+            if "Taxa de liquidação" in line:
+                liquidation_tax = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())     
+                #print("Liquidation_tax")
+                #print(liquidation_tax)
+        for t in transactions:
+            t["costs"] = {"settlement_fee": settlement_fee,  "liquidation_tax": liquidation_tax, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
 
     return transactions
         
@@ -169,7 +160,7 @@ if __name__ == "__main__":
     all_transactions = []
     
     
-    #If the folder doesn't exist on your local test, switch to the correct path where you saved the .txt file
+    #If the folder doesn't exist on local test, switch to the correct path where saved the .txt file
     if os.path.exists(bronze_dir):
         for file in os.listdir(bronze_dir):
             if file.endswith(".txt"):
@@ -179,29 +170,29 @@ if __name__ == "__main__":
                 #Group the costs structure
                 for transaction in data:
                     costs=transaction.pop("costs",{})
-                    transaction["settlement_fee"] = costs.get("settlement_fee",0.0)
-                    transaction["emoluments"] = costs.get("emolument",0.0)
+                    transaction["settlement_fee"] = costs.get("settlement_fee",0.0)+ costs.get("liquidation_tax",0.0)
+                    transaction["emoluments"] = costs.get("emoluments",0.0)
                     transaction["brokerage_fee"] = costs.get("brokerage_fee",0.0)
+                    #transaction["liquidation_tax"] = costs.get("liquidation_tax",0.0)
+                    transaction["total_fees"]= transaction["settlement_fee"] + transaction["emoluments"] + transaction["brokerage_fee"] #+ transaction["liquidation_tax"]
+                    transaction["total_cost"]= transaction["gross_value"] + transaction["total_fees"]
+                    
+                    #print("===== transaction['total_cost'] =====")
+                    #print(transaction["total_cost"])
                     
                     all_transactions.append(transaction)
                     
         df_silver = pd.DataFrame(all_transactions)
         
         os.makedirs(silver_dir,exist_ok=True)
-        parquet_path = os.path.join(silver_dir,"fact_transactions.parquet")
+        parquet_path = os.path.join(silver_dir,"transactions.parquet")
         
         df_silver.to_parquet(parquet_path,index=False)
         
-        print(f"\n✨ Silver layer successfully recorded on:: {parquet_path}")
+        print(f"\n=== Silver layer successfully recorded on:: {parquet_path} ===")
         
-        print("\n--- Visualization - Silver data ---")
+        print("\n=== Visualization - Silver data ===")
         
-        print(df_silver.to_string()) # Exibe a tabela completa estruturada no terminal
-                
-                #print(f"\n============ Default Output for {file} ============")
-                #print(data)
-                
-                #print(f"\n============ JSON Output for {file} ============")
-                #print(json.dumps(data, indent=4, ensure_ascii=False))
+        print(df_silver.to_string()) # Show the complete structured table on terminal
     else:
         print(f"Directory {bronze_dir} not found")
