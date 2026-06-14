@@ -113,6 +113,7 @@ def process_bronze_file(file_path):
     settlement_fee = 0.0
     emoluments = 0.0
     brokerage_fee = 0.0
+    asset_transfer_fee = 0.0
 
     if brokerage == "INTER":
         for idx, line in enumerate(lines):
@@ -133,18 +134,19 @@ def process_bronze_file(file_path):
 
     if brokerage == "RICO":
         for idx, line in enumerate(lines):
-            if "Taxa de Transf. de Ativos" in line or "Taxa de liquidação" in line:
-                settlement_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
+            if "Taxa de Transf. de Ativos" in line in line:
+                #settlement_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
+                asset_transfer_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
                         
             if "Emolumentos" in line:
                 emoluments = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
                 
             if "Taxa de liquidação" in line:
-                liquidation_tax = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())     
-                #print("Liquidation_tax")
-                #print(liquidation_tax)
+                settlement_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())     
+                #print("settlement_fee")
+                #print(settlement_fee)
         for t in transactions:
-            t["costs"] = {"settlement_fee": settlement_fee,  "liquidation_tax": liquidation_tax, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
+            t["costs"] = {"settlement_fee": settlement_fee,  "asset_transfer_fee": asset_transfer_fee, "emoluments": emoluments, "brokerage_fee": brokerage_fee}
 
     return transactions
         
@@ -170,11 +172,11 @@ if __name__ == "__main__":
                 #Group the costs structure
                 for transaction in data:
                     costs=transaction.pop("costs",{})
-                    transaction["settlement_fee"] = costs.get("settlement_fee",0.0)+ costs.get("liquidation_tax",0.0)
+                    transaction["settlement_fee"] = costs.get("settlement_fee",0.0)#+ costs.get("asset_transfer_fee",0.0)
                     transaction["emoluments"] = costs.get("emoluments",0.0)
                     transaction["brokerage_fee"] = costs.get("brokerage_fee",0.0)
-                    #transaction["liquidation_tax"] = costs.get("liquidation_tax",0.0)
-                    transaction["total_fees"]= transaction["settlement_fee"] + transaction["emoluments"] + transaction["brokerage_fee"] #+ transaction["liquidation_tax"]
+                    transaction["asset_transfer_fee"] = costs.get("asset_transfer_fee",0.0)
+                    transaction["total_fees"]= transaction["settlement_fee"] + transaction["emoluments"] + transaction["brokerage_fee"] + transaction["asset_transfer_fee"]
                     transaction["total_cost"]= transaction["gross_value"] + transaction["total_fees"]
                     
                     #print("===== transaction['total_cost'] =====")
