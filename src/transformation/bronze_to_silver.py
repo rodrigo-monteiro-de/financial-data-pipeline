@@ -16,6 +16,9 @@ def parse_date(date_str):
     
 
 def process_bronze_file(file_path):
+    #save que file name
+    source_file = os.path.basename(file_path)
+
     with open(file_path, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f.readlines()]
     
@@ -64,6 +67,8 @@ def process_bronze_file(file_path):
                 operation = "B" if dc_indicator == "D" else "S" # D = Debit (Buy/B), C = Credit (Sell/S)
                 
                 transactions.append({
+                
+                "source_file": source_file,
                 "trading_date":trading_date,
                 "brokerage":brokerage,
                 "operation":operation,
@@ -101,6 +106,7 @@ def process_bronze_file(file_path):
                     asset = "ATIVO_NAO_ENCONTRADO"
 
                 transactions.append({
+                    "source_file": source_file,
                     "trading_date": trading_date,
                     "brokerage": brokerage,
                     "operation": operation,
@@ -185,6 +191,60 @@ if __name__ == "__main__":
                     all_transactions.append(transaction)
                     
         df_silver = pd.DataFrame(all_transactions)
+        
+        # ==========================================
+        # Temporary fee allocation validation
+        # ==========================================
+
+        df_silver["weight"] = 0.0
+        df_silver["allocated_settlement_fee"] = 0.0
+        df_silver["allocated_emoluments"] = 0.0
+        df_silver["allocated_brokerage_fee"] = 0.0
+        df_silver["allocated_asset_transfer_fee"] = 0.0
+        df_silver["allocated_total_fees"] = 0.0
+
+        # ==========================================
+        # End temporary validation
+        # ==========================================
+        
+        
+        for source_file, group in df_silver.groupby("source_file"):
+            gross_total = group["gross_value"].sum()
+
+            print(f"\n===== {source_file} =====")
+            print(f"Gross Total: {gross_total}")
+            
+            for idx in group.index:
+                
+                weight = (
+                    df_silver.loc[idx,"gross_value"]
+                    / gross_total
+                )
+                
+                df_silver.loc[idx,"weight"] = weight
+                
+                df_silver.loc[idx,"allocated_settlement_fee"] =(
+                    df_silver.loc[idx,"settlement_fee"] * weight
+                )
+                
+                df_silver.loc[idx, "allocated_emoluments"] = (
+                            df_silver.loc[idx, "emoluments"] * weight
+                        )
+
+                df_silver.loc[idx, "allocated_brokerage_fee"] = (
+                    df_silver.loc[idx, "brokerage_fee"] * weight
+                )
+
+                df_silver.loc[idx, "allocated_asset_transfer_fee"] = (
+                    df_silver.loc[idx, "asset_transfer_fee"] * weight
+                )
+
+                df_silver.loc[idx, "allocated_total_fees"] = (
+                    df_silver.loc[idx, "allocated_settlement_fee"]
+                    + df_silver.loc[idx, "allocated_emoluments"]
+                    + df_silver.loc[idx, "allocated_brokerage_fee"]
+                    + df_silver.loc[idx, "allocated_asset_transfer_fee"]
+                )
         
         os.makedirs(silver_dir,exist_ok=True)
         parquet_path = os.path.join(silver_dir,"transactions.parquet")
