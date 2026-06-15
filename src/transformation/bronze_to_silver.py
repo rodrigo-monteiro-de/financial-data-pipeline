@@ -47,9 +47,6 @@ def process_bronze_file(file_path):
             
     #Second step: capture the transactions based on brokerage
     for idx,line in enumerate(lines):
-        
-        #if brokerage == "RICO" and ("@" in line or "BOVESPA" in line):
-            #print(f"[RAIO-X RICO] Linha {idx} na memória: '{line}'")
             
         #PARSER - INTER
         if brokerage == "INTER" and line.startswith("Bovespa"):
@@ -62,6 +59,11 @@ def process_bronze_file(file_path):
                 unit_price = clean_float(match.group(2))
                 gross_value = clean_float(match.group(3))
                 asset = match.group(4).strip()
+               
+                #print("ANTES:", repr(asset))
+                asset = " ".join(asset.split())
+                #print("DEPOIS:", repr(asset))
+                
                 dc_indicator = match.group(5) if match.group(5) else "C" # Default if not located on line
                 
                 operation = "B" if dc_indicator == "D" else "S" # D = Debit (Buy/B), C = Credit (Sell/S)
@@ -80,30 +82,39 @@ def process_bronze_file(file_path):
             
         #PARSER - RICO
         if brokerage == "RICO" and line == "@":
-            # Junta as próximas linhas para o Regex processar os valores numéricos
+            '''print("\n===== ATIVO RICO =====")
+            for i in range(idx-4, idx+1):
+                if i >= 0:
+                    print(i, "|", lines[i])'''
+            
+            # Group the next lines  processing the number values by Regex 
             next_lines = lines[idx+1 : idx+5]
             combined_text = "@ " + " ".join(next_lines)
             
             match_valores = re.search(r"@\s*(\d+)\s*(\S+)\s*(\S+)\s*([DC])", combined_text)
             
+            
             if match_valores:
+                
                 qtt = int(match_valores.group(1))
                 unit_price = clean_float(match_valores.group(2))
                 gross_value = clean_float(match_valores.group(3))
                 dc_indicator = match_valores.group(4)
                 operation = "B" if dc_indicator == "D" else "S"
                 
-                # Resgata a linha de cima (Linha 16), onde está o ativo
-                line_ativo = lines[idx-1].strip()
-                
-                # Isola o ativo: divide a linha por espaços
-                parts = line_ativo.split()
-                if parts:
-                    # Se a linha termina com "CI", pega o elemento anterior (o Ticker)
-                    # Caso contrário, pega a última palavra disponível
-                    asset = parts[-2] if parts[-1] == "CI" and len(parts) > 1 else parts[-1]
+                # Rico brokerage notes may include governance level markers
+                # (e.g., N1, N2, NM) between the asset description and the
+                # quantity/price section. When detected, the asset description
+                # must be extracted from two lines above instead of one.
+                if lines[idx-1].strip() in ["N1", "N2", "NM", "EDJ", "EJ"]:
+                    active_line = lines[idx-2].strip()
                 else:
-                    asset = "ATIVO_NAO_ENCONTRADO"
+                    active_line = lines[idx-1].strip()
+                
+                asset = active_line
+                #print("ANTES:", repr(asset))
+                asset = " ".join(asset.split())
+                #print("DEPOIS:", repr(asset))
 
                 transactions.append({
                     "source_file": source_file,
@@ -115,6 +126,8 @@ def process_bronze_file(file_path):
                     "unit_price": unit_price,
                     "gross_value": gross_value
                 })
+                
+                #print("ASSET FINAL:", asset)
                 
     settlement_fee = 0.0
     emoluments = 0.0
@@ -166,8 +179,7 @@ if __name__ == "__main__":
     silver_dir = "data_lake/silver"
     
     all_transactions = []
-    
-    
+
     #If the folder doesn't exist on local test, switch to the correct path where saved the .txt file
     if os.path.exists(bronze_dir):
         for file in os.listdir(bronze_dir):
@@ -192,6 +204,15 @@ if __name__ == "__main__":
                     
         df_silver = pd.DataFrame(all_transactions)
         
+        #debug - asset 
+        for asset in df_silver["asset"]:
+            print(repr(asset))
+        
+            if len(all_transactions) == 0:
+                raise Exception(
+                    "No transactions found. Check if Bronze contains TXT files."
+                )
+        
         # ==========================================
         # Temporary fee allocation validation
         # ==========================================
@@ -205,14 +226,13 @@ if __name__ == "__main__":
 
         # ==========================================
         # End temporary validation
-        # ==========================================
-        
+        # ==========================================     
         
         for source_file, group in df_silver.groupby("source_file"):
             gross_total = group["gross_value"].sum()
 
             print(f"\n===== {source_file} =====")
-            print(f"Gross Total: {gross_total}")
+            #print(f"Gross Total: {gross_total}")
             
             for idx in group.index:
                 
