@@ -1,11 +1,15 @@
 import os 
 from pypdf import PdfReader
 from dotenv import load_dotenv
+from pathlib import Path
 
-#Configuracao dos diretorios relativos
-#BASE_DIR = os.path.join(os.path.dirname(__file__),"..","..")
-BASE_DIR = os.getcwd()
-BRONZE_DIR = os.path.join(BASE_DIR,"data_lake","bronze")
+
+#BASE_DIR = os.getcwd()
+#BRONZE_DIR = os.path.join(BASE_DIR,"data_lake","bronze")
+
+BASE_DIR = Path(__file__).resolve().parents[2]  # raiz do projeto
+BRONZE_DIR = BASE_DIR / "data_lake" / "bronze"
+
 
 # load the variables from hidden file  .env
 #load_dotenv()

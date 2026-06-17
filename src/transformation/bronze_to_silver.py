@@ -2,6 +2,11 @@ import os
 import re
 import json
 
+def is_auxiliary_marker(text):
+    return text in(
+         "@", "@#", "N1", "N2", "NM", "ED", "EDJ", "EJ"
+    )
+
 def clean_float(value_str):
     #standardize currency to real (BR)
     if not value_str:
@@ -41,6 +46,7 @@ def process_bronze_file(file_path):
         print(f"Brokerage or trading date not found")
         return []
     
+    print(f"===== {source_file} ======")
     print(f"Extacting transactions | brokerage:{brokerage}| Trading date:{trading_date}")
     
     transactions = []
@@ -81,53 +87,80 @@ def process_bronze_file(file_path):
                 })
             
         #PARSER - RICO
-        if brokerage == "RICO" and line == "@":
+        if brokerage == "RICO" and line in ["VISTA", "FRACIONARIO"]:
+            cursor = idx + 1
+            
+            while cursor < len(lines):
+                if re.fullmatch(r"\d+", lines[cursor].strip()):
+                    break
+                    
+                cursor += 1
+                
+            if cursor >= len(lines):
+                continue
+                
             '''print("\n===== ATIVO RICO =====")
             for i in range(idx-4, idx+1):
                 if i >= 0:
                     print(i, "|", lines[i])'''
             
             # Group the next lines  processing the number values by Regex 
-            next_lines = lines[idx+1 : idx+5]
-            combined_text = "@ " + " ".join(next_lines)
             
-            match_valores = re.search(r"@\s*(\d+)\s*(\S+)\s*(\S+)\s*([DC])", combined_text)
+            if cursor + 3 >= len(lines):
+                    continue
             
+            qtt = int(lines[cursor].strip())
+            unit_price = clean_float(lines[cursor+1].strip())
+            gross_value = clean_float(lines[cursor+2].strip())
+            dc_indicator = lines[cursor+3].strip()
             
-            if match_valores:
-                
-                qtt = int(match_valores.group(1))
-                unit_price = clean_float(match_valores.group(2))
-                gross_value = clean_float(match_valores.group(3))
-                dc_indicator = match_valores.group(4)
-                operation = "B" if dc_indicator == "D" else "S"
-                
-                # Rico brokerage notes may include governance level markers
-                # (e.g., N1, N2, NM) between the asset description and the
-                # quantity/price section. When detected, the asset description
-                # must be extracted from two lines above instead of one.
-                if lines[idx-1].strip() in ["N1", "N2", "NM", "EDJ", "EJ"]:
-                    active_line = lines[idx-2].strip()
-                else:
-                    active_line = lines[idx-1].strip()
-                
-                asset = active_line
-                #print("ANTES:", repr(asset))
-                asset = " ".join(asset.split())
-                #print("DEPOIS:", repr(asset))
+            operation = "B" if dc_indicator == "D" else "S"
+            
+            asset_idx = cursor -1
+            
+            while (
+                asset_idx >= 0
+                and is_auxiliary_marker(lines[asset_idx].strip())
+                ):
+                asset_idx -= 1
 
-                transactions.append({
-                    "source_file": source_file,
-                    "trading_date": trading_date,
-                    "brokerage": brokerage,
-                    "operation": operation,
-                    "asset": asset,
-                    "quantity": qtt,
-                    "unit_price": unit_price,
-                    "gross_value": gross_value
-                })
-                
-                #print("ASSET FINAL:", asset)
+            asset = " ".join(lines[asset_idx].split())
+            
+            print(
+                f"-----> asset={asset}, \n  ------ qtt={qtt}, "
+                f"\n  ------ unit_price={unit_price}, "
+                f"\n  ------ gross_value={gross_value},"
+                f"\n  ------ debit/credit={dc_indicator}"
+            )
+            
+            
+            '''if lines[idx-1].strip() in ["N1", "N2", "NM", "EDJ", "EJ"]:
+                #print("DEBUG --> caiu no IF")
+                active_line = lines[idx-2].strip()
+                if len(active_line.strip()) == 2:#"ED":
+                    active_line = lines[idx-3].strip()
+                print(f"Active_line: {active_line}")
+            else:
+                print("DEBUG --> caiu no ELSE")
+                active_line = lines[idx-1].strip()
+                print(f"Active_line: {active_line}")'''
+           
+            
+            #print("ANTES:", repr(asset))
+            #asset = " ".join(asset.split())
+
+            transactions.append({
+                "source_file": source_file,
+                "trading_date": trading_date,
+                "brokerage": brokerage,
+                "operation": operation,
+                "asset": asset,
+                "quantity": qtt,
+                "unit_price": unit_price,
+                "gross_value": gross_value
+            })
+            
+            #print("ASSET FINAL:", asset)
                 
     settlement_fee = 0.0
     emoluments = 0.0
@@ -153,7 +186,7 @@ def process_bronze_file(file_path):
 
     if brokerage == "RICO":
         for idx, line in enumerate(lines):
-            if "Taxa de Transf. de Ativos" in line in line:
+            if "Taxa de Transf. de Ativos" in line:
                 #settlement_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
                 asset_transfer_fee = clean_float(lines[idx-1].replace("D", "").replace("C", "").strip())
                         
@@ -195,7 +228,7 @@ if __name__ == "__main__":
                     transaction["brokerage_fee"] = costs.get("brokerage_fee",0.0)
                     transaction["asset_transfer_fee"] = costs.get("asset_transfer_fee",0.0)
                     transaction["total_fees"]= transaction["settlement_fee"] + transaction["emoluments"] + transaction["brokerage_fee"] + transaction["asset_transfer_fee"]
-                    transaction["total_cost"]= transaction["gross_value"] + transaction["total_fees"]
+                    #transaction["total_cost"]= transaction["gross_value"] + transactiom[ #transaction["total_fees"]
                     
                     #print("===== transaction['total_cost'] =====")
                     #print(transaction["total_cost"])
@@ -206,7 +239,8 @@ if __name__ == "__main__":
         
         #debug - asset 
         for asset in df_silver["asset"]:
-            print(repr(asset))
+            #print("===== ATIVO =====")
+            #print(repr(asset))
         
             if len(all_transactions) == 0:
                 raise Exception(
@@ -231,7 +265,7 @@ if __name__ == "__main__":
         for source_file, group in df_silver.groupby("source_file"):
             gross_total = group["gross_value"].sum()
 
-            print(f"\n===== {source_file} =====")
+            #print(f"\n===== {source_file} =====")
             #print(f"Gross Total: {gross_total}")
             
             for idx in group.index:
@@ -265,9 +299,16 @@ if __name__ == "__main__":
                     + df_silver.loc[idx, "allocated_brokerage_fee"]
                     + df_silver.loc[idx, "allocated_asset_transfer_fee"]
                 )
+                
+                df_silver.loc[idx,"total_cost"]=(
+                    df_silver.loc[idx, "gross_value"]
+                    + df_silver.loc[idx,"allocated_total_fees"]
+                )
         
         os.makedirs(silver_dir,exist_ok=True)
         parquet_path = os.path.join(silver_dir,"transactions.parquet")
+        
+        df_silver = df_silver.sort_values(by=['trading_date','source_file',  'asset'], ascending=[True, True,True])
         
         df_silver.to_parquet(parquet_path,index=False)
         
