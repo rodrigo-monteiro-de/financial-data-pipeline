@@ -7,6 +7,8 @@ df_silver = pd.read_parquet(
     "data_lake/silver/transactions.parquet"
 )
 
+df_silver["trading_date"] = pd.to_datetime(df_silver["trading_date"])
+
 if debug ==1:
     print(df_silver.head(100))
 
@@ -43,7 +45,7 @@ dim_date=(
         .reset_index(drop=True)
 )
 
-dim_date["trading_date"] = pd.to_datetime(dim_date["trading_date"])
+#dim_date["trading_date"] = pd.to_datetime(dim_date["trading_date"])
 
 dim_date["year"] = dim_date["trading_date"].dt.year
 dim_date["month"] = dim_date["trading_date"].dt.month
@@ -84,7 +86,7 @@ dim_operation = dim_operation[
 ]
 
 dim_date = dim_date[
-    ["date_key", "trading_date","year","month", "day"]
+    ["date_key", "trading_date","year","month", "day","quarter"]
 ]
     
 print("========================= dim_brokerage =======================================")
@@ -126,37 +128,49 @@ dim_date.to_parquet(
 fact_trades = df_silver.copy()
  
  #left join dataframe silver with dimension brokerage
-fact_trades = df_silver.merge(
+fact_trades = fact_trades.merge(
     dim_brokerage,
     on = "brokerage",
     how="left"
- )
+)
  
  #left join dataframe silver with dimention asset
 fact_trades = fact_trades.merge(
     dim_asset,
     on = "asset",
     how = "left"
- )
+)
  
  #left join dataframe silver with dimention operation
 fact_trades=fact_trades.merge(
     dim_operation,
     on="operation",
     how="left"
- )
- 
+)
+
+#left join dataframe silver with dimention date
+fact_trades=fact_trades.merge(
+    dim_date,
+    on="trading_date",
+    how="left"
+)
+
 fact_trades = fact_trades[
     [
         "source_file",
         "trading_date",
+        "date_key",
+        "year",
+        "month",
+        "day",
+        "quarter",
         "brokerage", 
         "operation", 
         "asset", 
-        "quantity", 
-        "unit_price", 
-        "gross_value", 
-        "settlement_fee", 
+        "quantity",
+        "unit_price",
+        "gross_value",
+        "settlement_fee",
         "emoluments", 
         "brokerage_fee", 
         "asset_transfer_fee", 
