@@ -32,8 +32,8 @@ def process_bronze_file(file_path):
     
     #First step: find out the trading day and wich brokerage it is
     for i,line in enumerate(lines):
-        if "INTER" in line:
-            brokerage = "INTER"
+        '''if "INTER" in line:
+            brokerage = "INTER"'''
         if "RICO" in line:
             brokerage = "RICO"
             
@@ -54,7 +54,7 @@ def process_bronze_file(file_path):
     #Second step: capture the transactions based on brokerage
     for idx,line in enumerate(lines):
             
-        #PARSER - INTER
+        '''#PARSER - INTER
         if brokerage == "INTER" and line.startswith("Bovespa"):
             # Ex: Bovespa VISV 50 98.47 4,923.50 CDRN MICROSOFT (note: may or may not have D/C explicitly at the end)
             # Let's use a flexible regex to capture the blocks of numbers and the final text
@@ -84,7 +84,7 @@ def process_bronze_file(file_path):
                 "quantity":qtt,
                 "unit_price":unit_price,
                 "gross_value":gross_value
-                })
+                })'''
             
         #PARSER - RICO
         if brokerage == "RICO" and line in ["VISTA", "FRACIONARIO"]:
@@ -300,10 +300,16 @@ if __name__ == "__main__":
                     + df_silver.loc[idx, "allocated_asset_transfer_fee"]
                 )
                 
-                df_silver.loc[idx,"total_cost"]=(
-                    df_silver.loc[idx, "gross_value"]
-                    + df_silver.loc[idx,"allocated_total_fees"]
-                )
+                if df_silver.loc[idx,"operation"] == "S":
+                    df_silver.loc[idx,"total_cost"]=(
+                        df_silver.loc[idx, "gross_value"]
+                        - df_silver.loc[idx,"allocated_total_fees"]
+                    )
+                else:
+                     df_silver.loc[idx,"total_cost"]=(
+                        df_silver.loc[idx, "gross_value"]
+                        + df_silver.loc[idx,"allocated_total_fees"]
+                    )               
         
         os.makedirs(silver_dir,exist_ok=True)
         parquet_path = os.path.join(silver_dir,"transactions.parquet")
