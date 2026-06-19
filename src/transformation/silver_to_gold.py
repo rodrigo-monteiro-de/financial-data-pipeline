@@ -89,17 +89,17 @@ dim_date = dim_date[
     ["date_key", "trading_date","year","month", "day","quarter"]
 ]
     
-print("========================= dim_brokerage =======================================")
+print("\n========================= dim_brokerage =======================================")
 print(dim_brokerage)
 
-print("========================= dim_asset =======================================")
+print("\n========================= dim_asset =======================================")
 print(dim_asset)
 
-print("========================= dim_operation =======================================")
+print("\n========================= dim_operation =======================================")
 print(dim_operation)
 
 
-print("========================= dim_date =======================================")
+print("\n========================= dim_date =======================================")
 print(dim_date)
 
 gold_dir = Path("data_lake/gold")
@@ -158,15 +158,18 @@ fact_trades=fact_trades.merge(
 fact_trades = fact_trades[
     [
         "source_file",
-        "trading_date",
+        #"trading_date",
         "date_key",
-        "year",
-        "month",
-        "day",
-        "quarter",
-        "brokerage", 
-        "operation", 
-        "asset", 
+        "brokerage_key",
+        "asset_key", 
+        "operation_key",
+        #"year",
+        #"month",
+        #"day",
+        #"quarter",
+        #"brokerage", 
+        #"operation", 
+        #"asset", 
         "quantity",
         "unit_price",
         "gross_value",
@@ -182,21 +185,30 @@ fact_trades = fact_trades[
         "allocated_asset_transfer_fee", 
         "allocated_total_fees", 
         "total_cost", 
-        "brokerage_key", 
-        "asset_key", 
-        "operation_key", 
-        "operation_description"
+        #"operation_description"
         ]
 ]
-    
- 
-print("========================= fact_trades =======================================")
-print(fact_trades.columns.tolist())
+
+fact_trades["source_file"] = (
+    fact_trades["source_file"]
+    .str.replace(r"NotaNegociacao-\d+", "NotaNegociacao-XXXXX", regex=True)
+)
+
+fact_trades.to_parquet(
+    gold_dir / "fact_trades.parquet",
+    index = False
+ )
+
+print("\n========================= fact_trades =======================================")
+#print(fact_trades.columns.tolist())
+
+print(fact_trades)
 
 
 #print(dim_brokerage.columns.tolist())
-print("*********************************")
+#print("*********************************")
 #print(dim_asset.columns.tolist())
-print(dim_date.columns.tolist())
-#print(fact_trades.shape)
+#print(dim_date.columns.tolist())
 #print(fact_trades[["brokerage", "brokerage_key", "asset", "asset_key", "operation", "operation_key"]].drop_duplicates())
+
+
