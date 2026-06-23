@@ -1,8 +1,12 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, Window, functions as F
+from pyspark.sql.types import StructType, StringType, LongType, DoubleType, StructField
+
 from pyspark.sql.functions import lit
-import os
+
+import os 
 import re
-import json
+
+
 
 spark = (
     SparkSession.builder
@@ -10,7 +14,25 @@ spark = (
     .getOrCreate()
 )
 
+silver_schema = StructType([
+    StructField("source_file",StringType(),True),
+    StructField("trading_date",StringType(),True),
+    StructField("brokerage",StringType(),True),
+    StructField("operation",StringType(),True),
+    StructField("asset",StringType(),True),
+    StructField("quantity",LongType(),True),
+    StructField("unit_price",DoubleType(),True),
+    StructField("gross_value",DoubleType(),True),
+    StructField("settlement_fee", DoubleType(), True),
+    StructField("emoluments", DoubleType(), True ),
+    StructField("brokerage_fee", DoubleType(), True),
+    StructField("asset_transfer_fee", DoubleType(), True)
+])
+
 print("+++++++++++++++++++ SparkSession criada com sucesso!+++++++++++++++++++++++++++++++++++++")
+
+
+#shema definition
 
 debug = 0
 
@@ -150,8 +172,10 @@ def process_bronze_file(file_path):
         
 #execution fast test
 
+
+
 if __name__ == "__main__":
-    import pandas as pd
+
     
     #Using bronze path
     bronze_dir = "data_lake/bronze"
@@ -181,17 +205,53 @@ if __name__ == "__main__":
         #df_silver = pd.DataFrame(all_transactions)
         
         #print("Antes do create DataFrame")
-        df_silver = spark.createDataFrame(all_transactions)
+        df_silver = spark.createDataFrame(all_transactions,schema=silver_schema)
         #print("Depois do create DataFrame")
 
         df_silver.printSchema()
         df_silver.show(5,truncate=False)
 
-        df_silver = df_silver.withColumn("weight", lit(0.0))
+        #df_silver = df_silver.withColumn("weight", lit(0.0))
+        #df_silver.printSchema()
+        #df_silver.show(5,truncate=False)
+
+        #define the window: group by source file
+        window_spec = Window.partitionBy("source_file")
+
+        #Calculate gross value total by file
+        df_silver = df_silver.withColumn(
+            "weight",
+            F.col("gross_value") / F.sum("gross_value").over(window_spec)
+        )
+
+        #list all taxes columns to proccess
+        taxes_columns = ["settlement_fee","emoluments", "brokerage_fee", "asset_transfer_fee"]
+
+        #calculate all columns once a time
+        for column in taxes_columns:
+            df_silver = df_silver.withColumn(
+                "allocated_" + column,
+                F.col(column) * F.col("weight")
+            )
+
+        df_silver = df_silver.withColumn(
+            "allocated_total_fees",
+            F.col("allocated_settlement_fee") +
+            F.col("allocated_emoluments") +
+            F.col("allocated_brokerage_fee") +
+            F.col("allocated_asset_transfer_fee")
+
+        )
+
+        df_silver = df_silver.withColumn(
+            "allocated_total_cost",
+            F.col("allocated_total_fees")+
+            F.col("gross_value")
+        )
+
         df_silver.printSchema()
         df_silver.show(5,truncate=False)
 
-        
         import sys
         sys.exit()
 
