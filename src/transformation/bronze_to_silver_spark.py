@@ -6,6 +6,12 @@ from pyspark.sql.functions import lit
 import os 
 import re
 
+import sys
+
+# Força o ambiente a reconhecer a pasta do Hadoop
+os.environ['HADOOP_HOME'] = r'C:\hadoop'
+os.environ['PATH'] = os.environ['PATH'] + r';C:\hadoop\bin'
+
 spark = (
     SparkSession.builder
     .appName("Financial_Data)Pipeline")
@@ -263,7 +269,23 @@ if __name__ == "__main__":
 
         #df_silver.write.mode("overwrite").parquet(parquet_path)
         #to_parquet(parquet_path,index=False)
-        df_silver.write.mode("overwrite").format("csv").save(parquet_path)
+
+        print("DEBUG >>>>>>")
+        #print(df_silver.count())
+        #df_silver.printSchema()
+        df_silver.show(5, truncate=False)
+
+        print("Spark:", spark.version)
+        print(
+            "Hadoop:",
+            spark.sparkContext._jvm.org.apache.hadoop.util.VersionInfo.getVersion()
+        )
+
+
+        df_silver.write \
+            .mode("overwrite") \
+            .format("parquet") \
+            .save("data_lake/silver/transactions")
 
         print("=" * 70)
         print("=" * 70)
@@ -273,7 +295,7 @@ if __name__ == "__main__":
         print("#" * 230)
         print("#"*100 ,  "VISUALIZATION - SILVER DATA", "#"*101)
         print("#" * 230)
-        df_silver.show(5, truncate =Falses)
+        df_silver.show(5, truncate =False)
         print("#" * 230)
     else:
         print("=" * 70)
