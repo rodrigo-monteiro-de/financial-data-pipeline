@@ -6,7 +6,11 @@ from pyspark.sql.functions import lit
 import os 
 import re
 
+import sys
 
+# Força o ambiente a reconhecer a pasta do Hadoop
+os.environ['HADOOP_HOME'] = r'C:\hadoop'
+os.environ['PATH'] = os.environ['PATH'] + r';C:\hadoop\bin'
 
 spark = (
     SparkSession.builder
@@ -208,8 +212,8 @@ if __name__ == "__main__":
         df_silver = spark.createDataFrame(all_transactions,schema=silver_schema)
         #print("Depois do create DataFrame")
 
-        df_silver.printSchema()
-        df_silver.show(5,truncate=False)
+        #df_silver.printSchema()
+        #df_silver.show(5,truncate=False)
 
         #df_silver = df_silver.withColumn("weight", lit(0.0))
         #df_silver.printSchema()
@@ -245,84 +249,44 @@ if __name__ == "__main__":
 
         df_silver = df_silver.withColumn(
             "allocated_total_cost",
-            F.col("allocated_total_fees")+
-            F.col("gross_value")
+            F.col("gross_value") +
+            F.when(F.col("operation")=="B", F.col("allocated_total_fees"))
+             .otherwise(-F.col("allocated_total_fees"))
         )
 
-        df_silver.printSchema()
+        #df_silver.printSchema()
         df_silver.show(5,truncate=False)
-
-        import sys
-        sys.exit()
-
-        #debug - asset 
-        for asset in df_silver["asset"]:
-        
-            if len(all_transactions) == 0:
-                raise Exception(
-                    "No transactions found. Check if Bronze contains TXT files."
-                )
-
-        #df_silver["weight"] = 0.0
-        df_silver["allocated_settlement_fee"] = 0.0
-        df_silver["allocated_emoluments"] = 0.0
-        df_silver["allocated_brokerage_fee"] = 0.0
-        df_silver["allocated_asset_transfer_fee"] = 0.0
-        df_silver["allocated_total_fees"] = 0.0 
-        
-        for source_file, group in df_silver.groupby("source_file"):
-            gross_total = group["gross_value"].sum()
-            
-            for idx in group.index:
-                
-                weight = (
-                    df_silver.loc[idx,"gross_value"]
-                    / gross_total
-                )
-                
-                df_silver.loc[idx,"weight"] = weight
-                
-                df_silver.loc[idx,"allocated_settlement_fee"] =(
-                    df_silver.loc[idx,"settlement_fee"] * weight
-                )
-                
-                df_silver.loc[idx, "allocated_emoluments"] = (
-                            df_silver.loc[idx, "emoluments"] * weight
-                        )
-
-                df_silver.loc[idx, "allocated_brokerage_fee"] = (
-                    df_silver.loc[idx, "brokerage_fee"] * weight
-                )
-
-                df_silver.loc[idx, "allocated_asset_transfer_fee"] = (
-                    df_silver.loc[idx, "asset_transfer_fee"] * weight
-                )
-
-                df_silver.loc[idx, "allocated_total_fees"] = (
-                    df_silver.loc[idx, "allocated_settlement_fee"]
-                    + df_silver.loc[idx, "allocated_emoluments"]
-                    + df_silver.loc[idx, "allocated_brokerage_fee"]
-                    + df_silver.loc[idx, "allocated_asset_transfer_fee"]
-                )
-                
-                if df_silver.loc[idx,"operation"] == "S":
-                    df_silver.loc[idx,"total_cost"]=(
-                        df_silver.loc[idx, "gross_value"]
-                        - df_silver.loc[idx,"allocated_total_fees"]
-                    )
-                else:
-                     df_silver.loc[idx,"total_cost"]=(
-                        df_silver.loc[idx, "gross_value"]
-                        + df_silver.loc[idx,"allocated_total_fees"]
-                    )               
         
         os.makedirs(silver_dir,exist_ok=True)
         parquet_path = os.path.join(silver_dir,"transactions.parquet")
         
-        df_silver = df_silver.sort_values(by=['trading_date','source_file',  'asset'], ascending=[True, True,True])
-        
-        df_silver.to_parquet(parquet_path,index=False)
-        
+        #df_silver = df_silver.sort_values(by=['trading_date','source_file',  'asset'], ascending=[True, True,True])
+        df_silver.orderBy(
+            F.col("trading_date").asc(),
+            F.col("source_file").asc(),
+            F.col("gross_value").desc()
+        )
+
+        #df_silver.write.mode("overwrite").parquet(parquet_path)
+        #to_parquet(parquet_path,index=False)
+
+        print("DEBUG >>>>>>")
+        #print(df_silver.count())
+        #df_silver.printSchema()
+        df_silver.show(5, truncate=False)
+
+        print("Spark:", spark.version)
+        print(
+            "Hadoop:",
+            spark.sparkContext._jvm.org.apache.hadoop.util.VersionInfo.getVersion()
+        )
+
+
+        df_silver.write \
+            .mode("overwrite") \
+            .format("parquet") \
+            .save("data_lake/silver/transactions")
+
         print("=" * 70)
         print("=" * 70)
         print(f"\n=== SUCCESS - Silver layer successfully recorded on: {parquet_path} ===")
@@ -331,8 +295,7 @@ if __name__ == "__main__":
         print("#" * 230)
         print("#"*100 ,  "VISUALIZATION - SILVER DATA", "#"*101)
         print("#" * 230)
-        
-        print(df_silver.to_string()) # Show the complete structured table on terminal
+        df_silver.show(5, truncate =False)
         print("#" * 230)
     else:
         print("=" * 70)
