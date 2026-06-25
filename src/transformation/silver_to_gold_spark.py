@@ -1,28 +1,58 @@
-import pandas as pd
+#import pandas as pd
 from pathlib import Path
+
+from pyspark.sql import SparkSession, Window, functions as F
+from pyspark.sql.types import StructType, StringType, LongType, DoubleType, StructField
+
+from pyspark.sql.functions import lit, col, year, month, dayofmonth,quarter, date_format
+
+import os 
+import re
+
+import sys
+
+spark = SparkSession.builder \
+.appName("SilverToGold") \
+.getOrCreate()
+
+#read the path, not the files:
+df_silver = spark.read.parquet("data_lake/silver/transactions")
+
+#convert the data type
+df_silver = df_silver.withColumn("trading_date", col("trading_date").cast("date"))
+
+
+
 
 debug = 0
 
-df_silver = pd.read_parquet(
-    "data_lake/silver/transactions.parquet"
-)
+#df_silver = pd.read_parquet( "data_lake/silver/transactions.parquet")
 
-df_silver["trading_date"] = pd.to_datetime(df_silver["trading_date"])
+#df_silver["trading_date"] = pd.to_datetime(df_silver["trading_date"])
 
 if debug ==1:
-    print(df_silver.head(100))
+    df_silver.show()
 
-    print(df_silver.shape)
+    
 
 
 # generate a dataframe [[]]]
 # drop duplicate data, sorting by brokerage and reseting the index 
-dim_brokerage = (
+'''dim_brokerage = (
     df_silver[["brokerage"]]
     .drop_duplicates()
     .sort_values("brokerage")
     .reset_index(drop=True)
-)
+)'''
+
+dim_brokerage = df_silver.select("brokerage") \
+    .distinct() \
+    .orderBy("brokerage")
+
+windowspec = Window.orderBy("brokerage")
+dim_brokerage = dim_brokerage.withColumn("brokerage_key",row_number().over(windowspec))
+
+dim_brokerage.show()
 
 dim_asset = (
     df_silver[["asset"]]
