@@ -1,0 +1,21 @@
+SELECT 
+source_file,
+trading_date,
+brokerage,
+operation,
+asset,
+quantity,
+unit_price,
+gross_value,
+settlement_fee,
+emoluments,
+brokerage_fee,
+asset_transfer_fee,
+weight,
+allocated_settlement_fee,
+allocated_emoluments,
+allocated_brokerage_fee,
+allocated_asset_transfer_fee,
+allocated_total_fees,
+allocated_total_cost
+FROM {{source('silver','transactions')}}
