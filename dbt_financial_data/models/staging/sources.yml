@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: silver
+    schema: main
+    tables:
+      - name: transactions
+        meta:
+          external_location: "data_lake/silver/transactions/*.parquet"
