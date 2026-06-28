@@ -1,13 +1,24 @@
-{{config(materialized='incremental', unique_key='asset')}}
+{{config(
+    materialized='incremental', 
+    unique_key='asset'
+    )
+}}
+
+WITH source AS(
+    SELECT DISTINCT 
+        asset
+    FROM {{ref('stg_transactions')}}
+)
 
 SELECT 
-    ROW_NUMBER() OVER(ORDER BY s.asset)  +
-    COALESCE((SELECT MAX(asset_key) FROM {{this}}), 0) AS asset_key,
-    s.asset,
-FROM {{ref('stg_transactions')}} s
-{% if is_incremental() %}
+    {{dbt_utils.generate_surrogate_key(['s.asset'])}} AS asset_key,
+    s.asset
+FROM source s
 LEFT JOIN {{this}} d
     ON s.asset = d.asset
+
+{% if is_incremental() %}
+
 WHERE d.asset IS NULL
+
 {% endif %}
-GROUP BY s.asset
