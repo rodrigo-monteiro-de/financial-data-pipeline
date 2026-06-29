@@ -1,5 +1,6 @@
 SELECT 
-source_file,
+md5(source_file) AS source_file_hash,
+
 trading_date,
 brokerage,
 operation,

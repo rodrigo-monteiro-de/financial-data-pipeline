@@ -255,8 +255,9 @@ if __name__ == "__main__":
         )
 
         #df_silver.printSchema()
-        df_silver.show(5,truncate=False)
-        
+        #df_silver.show(5,truncate=False)
+        df_silver.limit(5).collect()
+
         os.makedirs(silver_dir,exist_ok=True)
         parquet_path = os.path.join(silver_dir,"transactions.parquet")
         
@@ -273,7 +274,8 @@ if __name__ == "__main__":
         print("DEBUG >>>>>>")
         #print(df_silver.count())
         #df_silver.printSchema()
-        df_silver.show(5, truncate=False)
+        #df_silver.show(5, truncate=False)
+        df_silver.limit(5).collect()
 
         print("Spark:", spark.version)
         print(
@@ -295,7 +297,8 @@ if __name__ == "__main__":
         print("#" * 230)
         print("#"*100 ,  "VISUALIZATION - SILVER DATA", "#"*101)
         print("#" * 230)
-        df_silver.show(5, truncate =False)
+        #df_silver.show(5, truncate =False)
+        df_silver.limit(5).collect()
         print("#" * 230)
     else:
         print("=" * 70)
