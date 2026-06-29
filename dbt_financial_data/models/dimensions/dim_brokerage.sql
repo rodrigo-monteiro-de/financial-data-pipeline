@@ -1,25 +1,25 @@
 {{config(
     materialized='incremental', 
-    unique_key='asset'
+    unique_key='brokerage'
     )
 }}
 
 WITH source AS(
     SELECT DISTINCT 
-        asset
+        brokerage
     FROM {{ref('stg_transactions')}}
 )
 
 SELECT 
-    {{dbt_utils.generate_surrogate_key(['s.asset'])}} AS asset_key,
-    s.asset
+    {{dbt_utils.generate_surrogate_key(['s.brokerage'])}} AS brokerage_key,
+    s.brokerage
 FROM source s
 
 {% if is_incremental() %}
 
 LEFT JOIN {{this}} d
-    ON s.asset = d.asset
+    ON s.brokerage = d.brokerage
 
-WHERE d.asset IS NULL
+WHERE d.brokerage IS NULL
 
 {% endif %}
