@@ -3,7 +3,7 @@ conn = duckdb.connect('dev.duckdb')
 
 result = conn.execute("""
     SELECT * FROM 
-    fact_trades
+    git status
     LIMIT 10
 """).fetchdf()
 
