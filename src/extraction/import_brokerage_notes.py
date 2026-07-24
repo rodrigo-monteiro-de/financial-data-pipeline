@@ -2,7 +2,18 @@ import os
 from pypdf import PdfReader
 from dotenv import load_dotenv
 from pathlib import Path
+import re
 
+import hashlib
+
+def generate_file_hash(file_path):
+    sha256 = hashlib.sha256()
+
+    with open(file_path, "rb") as f:
+        while chunk := f.read(8192):
+            sha256.update(chunk)
+
+    return sha256.hexdigest()
 
 #BASE_DIR = os.getcwd()
 #BRONZE_DIR = os.path.join(BASE_DIR,"data_lake","bronze")
@@ -59,6 +70,80 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         print(f"Error - Reading PDF file {pdf_path}:{e}")
         return None
+
+def anonymize_text(text:str) -> str:
+    """
+        Remove personal data from brokerage text
+    """
+
+    #cpf
+    text =  re.sub(
+        r"\d{3}\.\d{3}\.\d{3}-\d{2}",
+        "[CPF]",
+        text
+    )
+
+    #Account
+    text = re.sub(
+        r"(Conta\s*:?\s*)[\d\-]+",
+        r"\1[ACCOUNT]",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Client
+    text = re.sub(
+        r"(Cliente\s*:?\s*).+",
+        r"\1[CLIENT]",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Client Code
+    text = re.sub(
+        r"(Código Cliente\s*:?\s*)\d+",
+        r"\1[CLIENT_CODE]",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Email
+    text = re.sub(
+        r"[\w\.-]+@[\w\.-]+",
+        "[EMAIL]",
+        text
+    )
+
+    # Phone
+    text = re.sub(
+        r"\(?\d{2}\)?\s?\d{4,5}-\d{4}",
+        "[PHONE]",
+        text
+    )
+
+    # Address
+    text = re.sub(
+    r"Rua .*",
+    "[ADDRESS]",
+    text
+    )
+
+    # zipcode
+    text = re.sub(
+    r"\d{5}-\d{3}",
+    "[ZIPCODE]",
+    text
+    )
+
+    # CC 
+    text = re.sub(
+        r"(Conta corrente\s*\n)\S+",
+        r"\1[ACCOUNT]",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    return text
         
 def run_ingestion():
     print("Starting ingestion on bronze layer")
@@ -90,12 +175,18 @@ def run_ingestion():
             #Keeps the exact same name as original file, only changing the file extension
             #example: 'NotaCorretagem_Rico_123.pdf' vira 'NotaCorretagem_Rico_123.txt'
             
-            txt_name = os.path.splitext(pdf_name)[0] + ".txt"
+            file_hash = generate_file_hash(pdf_path)[:16]
+
+            txt_name = f"{file_hash}.txt"
+            #txt_name = os.path.splitext(pdf_name)[0] + ".txt"
+
             txt_path= os.path.join(BRONZE_DIR,txt_name)
             
+            anonymous_text = anonymize_text(extract_text)
+
             #Save the raw text on bronze path
             with open(txt_path,"w", encoding="utf-8") as f:
-                f.write(extract_text)
+                f.write(anonymous_text)
                 
             print(f"=== Text successfully extracted and saved to:{txt_name} ===")
         else:
